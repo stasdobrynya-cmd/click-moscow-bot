@@ -151,8 +151,7 @@ def rewrite_news(title, link):
         category = "🏛️ Городская власть"
         hashtags = "#Москва #Мэрия"
     else:
-        category = "🏙️ Москва"
-        hashtags = "#Москва"
+        return None
 
     return (
         f"{category}\n\n"
@@ -172,6 +171,11 @@ def send_news_for_approval():
         return
 
     post = rewrite_news(title, link)
+
+    if not post:
+        send_message(MY_ID, "Новость не подходит под московские категории.")
+        return
+
     pending_post = post
 
     keyboard = {
