@@ -180,16 +180,8 @@ def check_buttons():
             pending_post = None
             send_message(MY_ID, "❌ Новость пропущена.")
 send_message(MY_ID, "🤖 Бот запущен. Буду проверять новости каждые 15 минут.")
-
-last_news_time = 0
-
-while True:
-    check_buttons()
-
-    if time.time() - last_news_time > 900:
-        send_news_for_approval()
-        last_news_time = time.time()
-
+# Одноразовый запуск для GitHub Actions
+send_news_for_approval()
 
 
 
