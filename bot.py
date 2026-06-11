@@ -10,11 +10,21 @@ MY_ID = 5183537335
 
 SOURCES = [
     "https://lenta.ru/rss/news",
-    "https://www.moslenta.ru/rss/news"
+    "https://ria.ru/export/rss2/moscow/index.xml",
+    "https://www.m24.ru/rss.xml",
 ]
 
 MOSCOW_KEYWORDS = [
-    "москва",
+    "мэрия",
+    "мосгордума",
+    "департамент транспорта",
+    "московское метро",
+    "аэропорт шереметьево",
+    "внуково",
+    "домодедово",
+    "замоскворечье",
+    "тверской",
+    "арбат""москва",
     "москве",
     "москвы",
     "московский",
@@ -45,7 +55,8 @@ MOSCOW_KEYWORDS = [
     "мцд",
     "мцк",
     "метро",
-    "собянин"
+    "собянин",
+    "росси"
 ]
 last_update_id = 0
 pending_post = None
@@ -69,31 +80,54 @@ def send_message(chat_id, text, keyboard=None):
 
     for attempt in range(3):
         try:
-            return requests.post(
+            response = requests.post(
                 f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
                 json=data,
-                timeout=20
-            ).json()
+                timeout=30
+            )
+
+            result = response.json()
+
+            if result.get("ok"):
+                print("Сообщение отправлено")
+                return result
+
+            print("Telegram ответил ошибкой:", result)
+
         except Exception as e:
             print("Ошибка отправки, попытка", attempt + 1, e)
-            time.sleep(60)
 
-    print("Не удалось отправить сообщение после 3 попыток")
+        time.sleep(30)
+
+    print("Не удалось отправить сообщение после 5 попыток")
     return None
+
 def get_latest_news():
     for source in SOURCES:
+        print("Проверяю источник:", source)
+
         feed = feedparser.parse(source)
+
         print("Источник:", source, "новостей найдено:", len(feed.entries))
 
         for entry in feed.entries:
             title = entry.title
             link = entry.link
-            title_lower = title.lower()
+            summary = getattr(entry, "summary", "")
 
-            if not any(word in title_lower for word in MOSCOW_KEYWORDS):
+            title = title.lower()
+            summary = summary.lower()
+            text_for_check = title + " " + summary
+
+            print("Проверяю новость:", title)
+
+            if not any(word in text_for_check for word in MOSCOW_KEYWORDS):
+                print("Пропущено:", title)
                 continue
 
             if link not in seen_links:
+                print("Найдена подходящая новость:", title)
+
                 seen_links.add(link)
 
                 with open(SEEN_FILE, "a") as f:
@@ -105,9 +139,28 @@ def get_latest_news():
 
 
 def rewrite_news(title, link):
-    # Пока без OpenAI. Потом сюда подключим ChatGPT.
-    return f"📰 {title}\n\nПодробнее: {link}"
+    title_lower = title.lower()
 
+    if any(word in title_lower for word in ["метро", "мцд", "мцк", "дорог", "транспорт", "автобус", "поезд"]):
+        category = "🚇 Транспорт"
+        hashtags = "#Москва #Транспорт"
+    elif any(word in title_lower for word in ["дтп", "пожар", "полиция", "задерж", "происшеств", "авар", "нападен"]):
+        category = "🚔 Происшествия"
+        hashtags = "#Москва #Происшествия"
+    elif any(word in title_lower for word in ["собянин", "мэр", "мэрия"]):
+        category = "🏛️ Городская власть"
+        hashtags = "#Москва #Мэрия"
+    else:
+        category = "🏙️ Москва"
+        hashtags = "#Москва"
+
+    return (
+        f"{category}\n\n"
+        f"🚨 {title}\n\n"
+        f"👉 Подробности по ссылке ниже.\n\n"
+        f"🔗 {link}\n\n"
+        f"{hashtags} #ClickMoscow"
+    )
 
 def send_news_for_approval():
     global pending_post
@@ -147,7 +200,7 @@ def check_buttons():
         ).json()
     except Exception as e:
         print("Ошибка Telegram, пробую позже:", e)
-        time.sleep(60)
+        time.sleep(30)
         return
 
     for update in response.get("result", []):
@@ -170,18 +223,20 @@ def check_buttons():
 
         if data == "publish":
             if pending_post:
-                send_message(CHANNEL, pending_post)
-                send_message(MY_ID, "✅ Опубликовано в канал.")
-                pending_post = None
+                result = send_message(CHANNEL, pending_post)
+
+                if result and result.get("ok"):
+                 send_message(MY_ID, "✅ Опубликовано в канал.")
+                 pending_post = None
+                else:
+                    send_message(MY_ID, "⚠️ Не удалось опубликовать в канал. Попробуй нажать кнопку ещё раз.")
             else:
                 send_message(MY_ID, "Нет новости для публикации.")
 
         elif data == "skip":
             pending_post = None
             send_message(MY_ID, "❌ Новость пропущена.")
-send_message(MY_ID, "🤖 Бот запущен. Буду проверять новости каждые 15 минут.")
+#send_message(MY_ID, "🤖 Бот запущен. Буду проверять новости каждые 15 минут.")
+
 # Одноразовый запуск для GitHub Actions
 send_news_for_approval()
-
-
-
