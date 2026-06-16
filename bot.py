@@ -191,11 +191,8 @@ def send_news_for_approval():
         ]
     }
 
-    send_message(
-        MY_ID,
-        f"{post}\n\nОпубликовать в канал?",
-        keyboard
-    )
+    send_message(CHANNEL, post)
+    send_message(MY_ID, "✅ Новость опубликована в канал.")
 
 
 def check_buttons():
