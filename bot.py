@@ -154,7 +154,8 @@ def rewrite_news(title, link):
         category = "🌳 Парки и отдых"
         hashtags = "#Москва #Отдых"
     else:
-        return None
+        category = "🏙 Москва и область"
+        hashtags = "#Москва #МосковскаяОбласть"
 
     return (
         f"{category}\n\n"
