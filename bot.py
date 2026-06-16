@@ -150,17 +150,6 @@ def rewrite_news(title, link):
     elif any(word in title_lower for word in ["собянин", "мэр", "мэрия"]):
         category = "🏛️ Городская власть"
         hashtags = "#Москва #Мэрия"
-        elif any(word in title_lower for word in ["фестиваль", "концерт", "выставка", "театр", "музей", "парк", "ярмарка"]):
-        category = "🎭 Афиша"
-        hashtags = "#Москва #Афиша"
-
-    elif any(word in title_lower for word in ["открыли", "открылся", "запустили", "строительство", "реконструкция", "благоустройство", "реставрация"]):
-        category = "🏗 Город"
-        hashtags = "#Москва #Город"
-
-    elif any(word in title_lower for word in ["погода", "дождь", "снег", "жара", "мороз", "ветер", "ливень"]):
-        category = "🌦 Погода"
-        hashtags = "#Москва #Погода"
     else:
         return None
 
