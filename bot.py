@@ -109,10 +109,19 @@ def send_photo(chat_id, image_url, caption):
 
 def generate_image_url(title, category):
     prompt = f"""
-Moscow city news illustration, modern editorial style,
-category: {category},
-topic: {title},
-cinematic, realistic, high quality, no text, no logos
+Russian news illustration.
+
+Topic: {title}
+
+Category: {category}
+
+Realistic photojournalism.
+Breaking news.
+Moscow.
+High quality.
+Professional news image.
+No text.
+No logos.
 """
 
     encoded_prompt = quote(prompt)
