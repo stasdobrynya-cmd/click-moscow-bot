@@ -4,6 +4,7 @@ import requests
 import feedparser
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "ВСТАВЬ_ТОКЕН_ТОЛЬКО_ЕСЛИ_ЗАПУСКАЕШЬ_НЕ_В_GITHUB")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 CHANNEL = "@click_Moscow"
 MY_ID = 5183537335
@@ -159,7 +160,53 @@ def get_latest_news():
 
     return None
 
+def rewrite_with_ai(title, summary, category):
+    if not OPENROUTER_API_KEY:
+        return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
 
+    prompt = f"""
+Перепиши новость для Telegram-канала Click Moscow.
+
+Стиль:
+- коротко
+- по-человечески
+- без воды
+- 2 предложения
+- только по-русски
+- без ссылок
+- без хэштегов
+- без заголовка
+
+Категория: {category}
+Заголовок: {title}
+Описание: {summary}
+"""
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "openrouter/free",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 180,
+                "temperature": 0.7
+            },
+            timeout=40
+        )
+
+        data = response.json()
+        text = data["choices"][0]["message"]["content"].strip()
+        return text
+
+    except Exception as e:
+        print("Ошибка ИИ-рерайта:", e)
+        return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
 def rewrite_news(title, link, summary):
     title_lower = title.lower()
 
@@ -206,7 +253,7 @@ def rewrite_news(title, link, summary):
         category = "🏙 Москва и область"
         hashtags = "#Москва #МосковскаяОбласть"
 
-    clean_summary = summary.strip()
+    clean_summary = rewrite_with_ai(title, summary, category)
 
     if not clean_summary:
         clean_summary = "Подробности можно открыть по кнопке ниже."
