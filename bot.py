@@ -1,10 +1,9 @@
+import os
 import time
 import requests
 import feedparser
 
-BOT_TOKEN = "8202418690:AAFAxas3OpdWT7_LbZhOTSdNxcUJc-L-8c4"
-OPENAI_API_KEY = "ПОКА_МОЖНО_ОСТАВИТЬ_ПУСТЫМ"
-
+BOT_TOKEN = os.getenv("BOT_TOKEN", "ВСТАВЬ_ТОКЕН_ТОЛЬКО_ЕСЛИ_ЗАПУСКАЕШЬ_НЕ_В_GITHUB")
 CHANNEL = "@click_Moscow"
 MY_ID = 5183537335
 
@@ -17,27 +16,31 @@ SOURCES = [
 LOCAL_KEYWORDS = [
     "москва", "москве", "москвы", "москов", "столице", "столичный",
     "подмосков", "московская область",
-
     "мкад", "ттк", "садовое кольцо", "мцд", "мцк", "метро",
     "вднх", "сокольники", "зарядье", "парк горького", "коломенское", "царицыно",
-
     "цао", "свао", "вао", "ювао", "юао", "юзао", "зао", "сзао", "сао",
     "арбат", "тверской", "хамовники", "пресня", "замоскворечье", "марьино",
     "бутово", "митине", "митино", "крылатское", "кунцево", "строгино",
-
     "химки", "балашиха", "мытищи", "люберцы", "красногорск", "реутов",
     "королев", "одинцово", "долгопрудный", "домодедово", "подольск",
     "щелково", "видное", "лобня", "сергиев посад", "электросталь"
 ]
-last_update_id = 0
-pending_post = None
+
 SEEN_FILE = "seen_links.txt"
+SEEN_TITLES_FILE = "seen_titles.txt"
 
 try:
     with open(SEEN_FILE, "r") as f:
         seen_links = set(line.strip() for line in f.readlines())
 except FileNotFoundError:
     seen_links = set()
+
+try:
+    with open(SEEN_TITLES_FILE, "r") as f:
+        seen_titles = set(line.strip() for line in f.readlines())
+except FileNotFoundError:
+    seen_titles = set()
+
 
 def send_message(chat_id, text, keyboard=None):
     data = {
@@ -56,7 +59,6 @@ def send_message(chat_id, text, keyboard=None):
                 json=data,
                 timeout=30
             )
-
             result = response.json()
 
             if result.get("ok"):
@@ -68,25 +70,59 @@ def send_message(chat_id, text, keyboard=None):
         except Exception as e:
             print("Ошибка отправки, попытка", attempt + 1, e)
 
-        time.sleep(30)
+        time.sleep(5)
 
-    print("Не удалось отправить сообщение после 5 попыток")
+    print("Не удалось отправить сообщение")
     return None
+
+
+def normalize_title(title):
+    text = title.lower()
+
+    for symbol in [".", ",", ":", ";", "!", "?", "«", "»", '"', "'", "-", "—", "(", ")"]:
+        text = text.replace(symbol, " ")
+
+    stop_words = [
+        "в", "на", "о", "об", "и", "а", "по", "для", "из", "с", "со", "у",
+        "к", "от", "до", "за", "над", "под", "при", "про", "это", "как",
+        "назвали", "названа", "назван", "рассказали", "сообщили"
+    ]
+
+    words = [word for word in text.split() if len(word) > 3 and word not in stop_words]
+    return set(words)
+
+
+def is_duplicate_title(new_title):
+    new_words = normalize_title(new_title)
+
+    for old_title in seen_titles:
+        old_words = normalize_title(old_title)
+
+        if not new_words or not old_words:
+            continue
+
+        common_words = new_words.intersection(old_words)
+        similarity = len(common_words) / max(len(new_words), len(old_words))
+
+        if similarity >= 0.5:
+            return True
+
+    return False
+
 
 def get_latest_news():
     for source in SOURCES:
         print("Проверяю источник:", source)
 
         feed = feedparser.parse(source)
-
         print("Источник:", source, "новостей найдено:", len(feed.entries))
 
         for entry in feed.entries:
-            title = entry.title
+            title_original = entry.title
             link = entry.link
             summary = getattr(entry, "summary", "")
 
-            title = title.lower()
+            title = title_original.lower()
             summary = summary.lower()
             text_for_check = title + " " + summary
 
@@ -96,22 +132,34 @@ def get_latest_news():
                 print("Пропущено:", title)
                 continue
 
-            if link not in seen_links:
-                print("Найдена подходящая новость:", title)
+            if link in seen_links:
+                print("Пропущено как уже опубликованная ссылка:", title)
+                continue
 
-                seen_links.add(link)
+            if is_duplicate_title(title):
+                print("Пропущено как дубль по смыслу:", title)
+                continue
 
-                with open(SEEN_FILE, "a") as f:
-                    f.write(link + "\n")
+            print("Найдена подходящая новость:", title)
 
-                return title, link
+            seen_links.add(link)
+            seen_titles.add(title)
+
+            with open(SEEN_FILE, "a") as f:
+                f.write(link + "\n")
+
+            with open(SEEN_TITLES_FILE, "a") as f:
+                f.write(title + "\n")
+
+            return title_original, link
 
     return None, None
 
 
 def rewrite_news(title, link):
     title_lower = title.lower()
-    if any(word in title_lower for word in ["квартира","жилье","жильё","пентхаус","недвижимость","новостройка","дом","застройщик"]):
+
+    if any(word in title_lower for word in ["квартира", "жилье", "жильё", "пентхаус", "недвижимость", "новостройка", "дом", "застройщик"]):
         category = "🏢 Недвижимость"
         hashtags = "#Москва #Недвижимость"
 
@@ -163,9 +211,9 @@ def rewrite_news(title, link):
         f"{hashtags} #ClickMoscow\n\n"
         f"🔔 Подписывайтесь на Click Moscow"
     )
-def send_news_for_approval():
-    global pending_post
 
+
+def send_news_for_approval():
     title, link = get_latest_news()
 
     if not title:
@@ -178,72 +226,8 @@ def send_news_for_approval():
         send_message(MY_ID, "Новость не подходит под московские категории.")
         return
 
-    pending_post = post
-
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": "✅ Опубликовать", "callback_data": "publish"},
-                {"text": "❌ Пропустить", "callback_data": "skip"}
-            ]
-        ]
-    }
-
     send_message(CHANNEL, post)
     send_message(MY_ID, "✅ Новость опубликована в канал.")
 
 
-def check_buttons():
-    global last_update_id, pending_post
-
-    try:
-        response = requests.get(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates",
-            params={"offset": last_update_id + 1, "timeout": 5}
-        ).json()
-    except Exception as e:
-        print("Ошибка Telegram, пробую позже:", e)
-        time.sleep(30)
-        return
-
-    for update in response.get("result", []):
-        last_update_id = update["update_id"]
-
-        if "callback_query" not in update:
-            continue
-
-        callback = update["callback_query"]
-        data = callback["data"]
-        callback_id = callback["id"]
-
-        try:
-            requests.post(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery",
-                json={"callback_query_id": callback_id}
-            )
-        except Exception as e:
-            print("Не смог ответить на кнопку:", e)
-
-        if data == "publish":
-            if pending_post:
-                result = send_message(CHANNEL, pending_post)
-
-                if result and result.get("ok"):
-                 send_message(MY_ID, "✅ Опубликовано в канал.")
-                 pending_post = None
-                else:
-                    send_message(MY_ID, "⚠️ Не удалось опубликовать в канал. Попробуй нажать кнопку ещё раз.")
-            else:
-                send_message(MY_ID, "Нет новости для публикации.")
-
-        elif data == "skip":
-            pending_post = None
-            send_message(MY_ID, "❌ Новость пропущена.")
-#send_message(MY_ID, "🤖 Бот запущен. Буду проверять новости каждые 15 минут.")
-
-# Одноразовый запуск для GitHub Actions
 send_news_for_approval()
-
-
-
-
