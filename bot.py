@@ -111,7 +111,9 @@ def get_latest_news():
 
 def rewrite_news(title, link):
     title_lower = title.lower()
-
+    if any(word in title_lower for word in ["квартира","жилье","жильё","пентхаус","недвижимость","новостройка","дом","застройщик"]):
+        category = "🏢 Недвижимость"
+        hashtags = "#Москва #Недвижимость"
     if any(word in title_lower for word in ["метро", "мцд", "мцк", "дорог", "транспорт", "автобус", "поезд"]):
         category = "🚇 Транспорт"
         hashtags = "#Москва #Транспорт"
@@ -154,7 +156,7 @@ def rewrite_news(title, link):
     return (
         f"{category}\n"
         f"{'━' * 20}\n\n"
-        f"📍 {title}\n\n"
+        f"🔥 {title.upper()}\n\n"
         f"📰 Подробности:\n"
         f"{link}\n\n"
         f"{hashtags} #ClickMoscow\n\n"
