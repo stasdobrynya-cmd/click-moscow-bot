@@ -158,12 +158,14 @@ def rewrite_news(title, link):
         hashtags = "#Москва #МосковскаяОбласть"
 
     return (
-        f"{category}\n\n"
-        f"🚨 {title}\n\n"
-        f"👉 Подробности по ссылке ниже.\n\n"
-        f"🔗 {link}\n\n"
-        f"{hashtags} #ClickMoscow"
-    )
+    f"{category}\n"
+    f"{'━' * 20}\n\n"
+    f"📍 {title}\n\n"
+    f"📰 Подробности:\n"
+    f"{link}\n\n"
+    f"{hashtags} #ClickMoscow\n\n"
+    f"🔔 Подписывайтесь на Click Moscow"
+)
 
 def send_news_for_approval():
     global pending_post
