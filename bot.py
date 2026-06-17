@@ -233,8 +233,6 @@ def rewrite_news(title, link, summary, source_name):
         f"🔥 {title.upper()}\n\n"
         f"📝 Кратко:\n"
         f"{clean_summary}\n\n"
-        f"📰 Источник: {source_name}\n"
-        f"🔗 {link}\n\n"
         f"{hashtags} #ClickMoscow\n\n"
         f"🔔 Подписывайтесь на Click Moscow"
     )
@@ -255,8 +253,18 @@ def send_news_for_approval():
         send_message(MY_ID, "Новость не подходит под московские категории.")
         return
 
-    send_message(CHANNEL, post)
-    send_message(MY_ID, "✅ Новость опубликована в канал.")
+    keyboard = {
+    "inline_keyboard": [
+        [
+            {
+                "text": "📖 Читать подробнее",
+                "url": link
+            }
+        ]
+    ]
+}
 
+    send_message(CHANNEL, post, keyboard)
+    send_message(MY_ID, "✅ Новость опубликована в канал.")
 
 send_news_for_approval()
