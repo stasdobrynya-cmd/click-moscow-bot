@@ -4,7 +4,6 @@ import requests
 import feedparser
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "ВСТАВЬ_ТОКЕН_ТОЛЬКО_ЕСЛИ_ЗАПУСКАЕШЬ_НЕ_В_GITHUB")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 CHANNEL = "@click_Moscow"
 MY_ID = 5183537335
@@ -161,11 +160,11 @@ def get_latest_news():
     return None
 
 def rewrite_with_ai(title, summary, category):
-    if not OPENROUTER_API_KEY:
-        print("OpenRouter API key не найден")
-        return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
+        if not GROQ_API_KEY:
+            print("Groq API key не найден")
+            return summary.strip() if summary.strip() else f"{title}. Подробности можно открыть по кнопке ниже."
 
-    prompt = f"""
+            prompt = f"""
 Перепиши новость для Telegram-канала Click Moscow.
 
 Стиль:
@@ -183,17 +182,15 @@ def rewrite_with_ai(title, summary, category):
 Описание: {summary}
 """
 
-    try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+        try:
+            response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/stasdobrynya-cmd/click-moscow-bot",
-                "X-Title": "Click Moscow Bot"
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
             },
             json={
-                "model": "openrouter/auto",
+                "model": "llama-3.1-8b-instant",
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
@@ -203,24 +200,19 @@ def rewrite_with_ai(title, summary, category):
             timeout=40
         )
 
-        print("OpenRouter status:", response.status_code)
+            print("Groq status:", response.status_code)
+            data = response.json()
 
-        data = response.json()
+            if response.status_code != 200:
+                print("Groq ответил ошибкой:", data)
+                return summary.strip() if summary.strip() else f"{title}. Подробности можно открыть по кнопке ниже."
 
-        if response.status_code != 200:
-            print("OpenRouter ответил ошибкой:", data)
-            return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
+                text = data["choices"][0]["message"]["content"].strip()
+            return text if text else f"{title}. Подробности можно открыть по кнопке ниже."
 
-        text = data["choices"][0]["message"]["content"].strip()
-
-        if not text:
-            return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
-
-        return text
-
-    except Exception as e:
-        print("Ошибка ИИ-рерайта:", e)
-        return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
+        except Exception as e:
+                print("Ошибка Groq-рерайта:", e)
+                return summary.strip() if summary.strip() else f"{title}. Подробности можно открыть по кнопке ниже."
 
 def rewrite_news(title, link, summary):
     title_lower = title.lower()
