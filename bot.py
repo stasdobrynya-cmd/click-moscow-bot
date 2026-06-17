@@ -45,30 +45,37 @@ seen_links = load_seen_file(SEEN_FILE)
 seen_titles = load_seen_file(SEEN_TITLES_FILE)
 
 
-def send_message(chat_id, text):
+def send_message(chat_id, text, keyboard=None):
     data = {
         "chat_id": chat_id,
         "text": text,
-        "disable_web_page_preview": True
+        "disable_web_page_preview": False
     }
 
-    try:
-        response = requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json=data,
-            timeout=30
-        )
-        result = response.json()
+    if keyboard:
+        data["reply_markup"] = keyboard
 
-        if result.get("ok"):
-            print("Сообщение отправлено")
-            return result
+    for attempt in range(3):
+        try:
+            response = requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json=data,
+                timeout=30
+            )
+            result = response.json()
 
-        print("Telegram ответил ошибкой:", result)
+            if result.get("ok"):
+                print("Сообщение отправлено")
+                return result
 
-    except Exception as e:
-        print("Ошибка отправки сообщения:", e)
+            print("Telegram ответил ошибкой:", result)
 
+        except Exception as e:
+            print("Ошибка отправки, попытка", attempt + 1, e)
+
+        time.sleep(5)
+
+    print("Не удалось отправить сообщение")
     return None
 
 
@@ -85,6 +92,7 @@ def send_photo(chat_id, image_url, caption):
             json=data,
             timeout=60
         )
+
         result = response.json()
 
         if result.get("ok"):
@@ -99,41 +107,25 @@ def send_photo(chat_id, image_url, caption):
     return None
 
 
-def ask_groq(prompt, max_tokens=180, temperature=0.7):
-    if not GROQ_API_KEY:
-        print("Groq API key не найден")
-        return None
+def generate_image_url(title, category):
+    prompt = f"""
+Russian news illustration.
 
-    try:
-        response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "llama-3.1-8b-instant",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": max_tokens,
-                "temperature": temperature
-            },
-            timeout=40
-        )
+Topic: {title}
 
-        print("Groq status:", response.status_code)
-        data = response.json()
+Category: {category}
 
-        if response.status_code != 200:
-            print("Groq ответил ошибкой:", data)
-            return None
+Realistic photojournalism.
+Breaking news.
+Moscow.
+High quality.
+Professional news image.
+No text.
+No logos.
+"""
 
-        return data["choices"][0]["message"]["content"].strip()
-
-    except Exception as e:
-        print("Ошибка Groq:", e)
-        return None
+    encoded_prompt = quote(prompt)
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
 
 
 def normalize_title(title):
@@ -148,7 +140,8 @@ def normalize_title(title):
         "назвали", "названа", "назван", "рассказали", "сообщили"
     ]
 
-    return set(word for word in text.split() if len(word) > 3 and word not in stop_words)
+    words = [word for word in text.split() if len(word) > 3 and word not in stop_words]
+    return set(words)
 
 
 def is_duplicate_title(new_title):
@@ -213,77 +206,16 @@ def get_latest_news():
             with open(SEEN_TITLES_FILE, "a", encoding="utf-8") as f:
                 f.write(title_original + "\n")
 
-            return title_original, summary_original
+            return title_original, link, summary_original
 
     return None
 
 
-def get_category(title):
-    title_lower = title.lower()
-
-    if any(word in title_lower for word in ["квартира", "жилье", "жильё", "пентхаус", "недвижимость", "новостройка", "дом", "застройщик"]):
-        return "🏢 Недвижимость", "#Москва #Недвижимость"
-
-    if any(word in title_lower for word in ["метро", "мцд", "мцк", "дорог", "транспорт", "автобус", "поезд", "водител"]):
-        return "🚇 Транспорт", "#Москва #Транспорт"
-
-    if any(word in title_lower for word in ["дтп", "пожар", "полиция", "задерж", "происшеств", "авар", "нападен"]):
-        return "🚨 Происшествия", "#Москва #Происшествия"
-
-    if any(word in title_lower for word in ["собянин", "мэр", "мэрия"]):
-        return "🏛 Городская власть", "#Москва #Мэрия"
-
-    if any(word in title_lower for word in ["парк", "парки", "пляж", "пляжи", "зона отдыха", "отдых", "купание", "вднх", "сокольники", "зарядье", "горького", "коломенское", "царицыно"]):
-        return "🌳 Парки и отдых", "#Москва #Отдых"
-
-    if any(word in title_lower for word in ["фестиваль", "концерт", "выставка", "театр", "музей", "звезд", "артист"]):
-        return "🎭 Афиша и городская жизнь", "#Москва #Афиша"
-
-    if any(word in title_lower for word in ["открыли", "открылся", "строительство", "реконструкция"]):
-        return "🏗 Город", "#Москва #Город"
-
-    if any(word in title_lower for word in ["бизнес", "инвестиции", "экономика", "ипотек"]):
-        return "💼 Бизнес и деньги", "#Москва #Бизнес"
-
-    if any(word in title_lower for word in ["погода", "ливень", "жара", "снег", "мороз"]):
-        return "🌤 Погода", "#Москва #Погода"
-
-    return "🏙 Москва и область", "#Москва #МосковскаяОбласть"
-
-
-def generate_ai_title(title, summary, category):
-    base_text = summary.strip() if summary.strip() else title
-
-    prompt = f"""
-Ты редактор городского Telegram-канала Click Moscow.
-
-Создай короткий цепляющий заголовок.
-
-Правила:
-- до 12 слов
-- без кликбейта
-- по существу
-- только русский язык
-- без кавычек
-- без точки в конце
-- можно использовать один эмодзи в начале
-
-Категория: {category}
-Оригинальный заголовок: {title}
-Текст новости: {base_text}
-
-Ответь только заголовком.
-"""
-
-    ai_title = ask_groq(prompt, max_tokens=80, temperature=0.8)
-
-    if not ai_title:
-        return f"🔥 {title}"
-
-    return ai_title.replace('"', "").replace("«", "").replace("»", "").strip()
-
-
 def rewrite_with_ai(title, summary, category):
+    if not GROQ_API_KEY:
+        print("Groq API key не найден")
+        return summary.strip() if summary.strip() else f"{title}. Подробности можно открыть по кнопке ниже."
+
     base_text = summary.strip() if summary.strip() else title
 
     prompt = f"""
@@ -299,59 +231,93 @@ def rewrite_with_ai(title, summary, category):
 - без заголовков
 - 40-80 слов
 
-Категория: {category}
 Новость:
 {base_text}
 """
 
-    text = ask_groq(prompt, max_tokens=180, temperature=0.7)
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.1-8b-instant",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 180,
+                "temperature": 0.7
+            },
+            timeout=40
+        )
 
-    if not text:
+        print("Groq status:", response.status_code)
+        data = response.json()
+
+        if response.status_code != 200:
+            print("Groq ответил ошибкой:", data)
+            return base_text
+
+        text = data["choices"][0]["message"]["content"].strip()
+        return text if text else base_text
+
+    except Exception as e:
+        print("Ошибка Groq-рерайта:", e)
         return base_text
 
-    return text
 
+def rewrite_news(title, link, summary):
+    title_lower = title.lower()
 
-def generate_image_prompt(title, summary, category):
-    base_text = summary.strip() if summary.strip() else title
+    if any(word in title_lower for word in ["квартира", "жилье", "жильё", "пентхаус", "недвижимость", "новостройка", "дом", "застройщик"]):
+        category = "🏢 Недвижимость"
+        hashtags = "#Москва #Недвижимость"
 
-    prompt = f"""
-Create an English image prompt for an AI image generator.
+    elif any(word in title_lower for word in ["метро", "мцд", "мцк", "дорог", "транспорт", "автобус", "поезд"]):
+        category = "🚇 Транспорт"
+        hashtags = "#Москва #Транспорт"
 
-Rules:
-- realistic photojournalism
-- Moscow atmosphere
-- modern editorial news style
-- no text
-- no logos
-- no flags unless directly needed
-- one short paragraph
-- do not mention Telegram
+    elif any(word in title_lower for word in ["дтп", "пожар", "полиция", "задерж", "происшеств", "авар", "нападен"]):
+        category = "🚨 Происшествия"
+        hashtags = "#Москва #Происшествия"
 
-Category: {category}
-News title: {title}
-News text: {base_text}
-"""
+    elif any(word in title_lower for word in ["собянин", "мэр", "мэрия"]):
+        category = "🏛 Городская власть"
+        hashtags = "#Москва #Мэрия"
 
-    image_prompt = ask_groq(prompt, max_tokens=120, temperature=0.8)
+    elif any(word in title_lower for word in ["парк", "парки", "пляж", "пляжи", "зона отдыха", "отдых", "купание", "вднх", "сокольники", "зарядье", "горького", "коломенское", "царицыно"]):
+        category = "🌳 Парки и отдых"
+        hashtags = "#Москва #Отдых"
 
-    if not image_prompt:
-        image_prompt = f"Realistic Moscow city news photo, {category}, {title}, modern editorial style, no text, no logos"
+    elif any(word in title_lower for word in ["фестиваль", "концерт", "выставка", "театр", "музей"]):
+        category = "🎭 Афиша"
+        hashtags = "#Москва #Афиша"
 
-    return image_prompt
+    elif any(word in title_lower for word in ["открыли", "открылся", "строительство", "реконструкция"]):
+        category = "🏗 Город"
+        hashtags = "#Москва #Город"
 
+    elif any(word in title_lower for word in ["бизнес", "инвестиции", "экономика"]):
+        category = "💼 Бизнес"
+        hashtags = "#Москва #Бизнес"
 
-def generate_image_url(title, summary, category):
-    image_prompt = generate_image_prompt(title, summary, category)
-    encoded_prompt = quote(image_prompt)
-    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+    elif any(word in title_lower for word in ["погода", "ливень", "жара", "снег", "мороз"]):
+        category = "🌤 Погода"
+        hashtags = "#Москва #Погода"
 
+    else:
+        if not any(word in title_lower for word in ["москва", "москве", "москвы", "москов", "подмосков", "московская область"]):
+            return None
 
-def create_post(title, summary):
-    category, hashtags = get_category(title)
+        category = "🏙 Москва и область"
+        hashtags = "#Москва #МосковскаяОбласть"
 
-    ai_title = generate_ai_title(title, summary, category)
     clean_summary = rewrite_with_ai(title, summary, category)
+
+    if not clean_summary:
+        clean_summary = "Подробности можно открыть по кнопке ниже."
 
     if len(clean_summary) > 350:
         clean_summary = clean_summary[:350].strip() + "..."
@@ -359,7 +325,7 @@ def create_post(title, summary):
     post = (
         f"{category}\n"
         f"{'━' * 20}\n\n"
-        f"{ai_title}\n\n"
+        f"🔥 {title.upper()}\n\n"
         f"📝 Кратко:\n"
         f"{clean_summary}\n\n"
         f"{hashtags} #ClickMoscow\n\n"
@@ -376,17 +342,17 @@ def send_news_for_approval():
         send_message(MY_ID, "Не смог найти новости в источниках.")
         return
 
-    title, summary = result
+    title, link, summary = result
 
-    created = create_post(title, summary)
+    rewritten = rewrite_news(title, link, summary)
 
-    if not created:
+    if not rewritten:
         send_message(MY_ID, "Новость не подходит под московские категории.")
         return
 
-    post, category = created
+    post, category = rewritten
 
-    image_url = generate_image_url(title, summary, category)
+    image_url = generate_image_url(title, category)
 
     result = send_photo(CHANNEL, image_url, post)
 
