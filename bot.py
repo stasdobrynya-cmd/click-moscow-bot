@@ -114,7 +114,8 @@ def rewrite_news(title, link):
     if any(word in title_lower for word in ["квартира","жилье","жильё","пентхаус","недвижимость","новостройка","дом","застройщик"]):
         category = "🏢 Недвижимость"
         hashtags = "#Москва #Недвижимость"
-    if any(word in title_lower for word in ["метро", "мцд", "мцк", "дорог", "транспорт", "автобус", "поезд"]):
+
+    elif any(word in title_lower for word in ["метро", "мцд", "мцк", "дорог", "транспорт", "автобус", "поезд"]):
         category = "🚇 Транспорт"
         hashtags = "#Москва #Транспорт"
 
