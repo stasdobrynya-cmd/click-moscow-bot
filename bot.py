@@ -162,6 +162,7 @@ def get_latest_news():
 
 def rewrite_with_ai(title, summary, category):
     if not OPENROUTER_API_KEY:
+        print("OpenRouter API key не найден")
         return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
 
     prompt = f"""
@@ -187,10 +188,12 @@ def rewrite_with_ai(title, summary, category):
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/stasdobrynya-cmd/click-moscow-bot",
+                "X-Title": "Click Moscow Bot"
             },
             json={
-                "model": "openrouter/free",
+                "model": "openrouter/auto",
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
@@ -200,13 +203,25 @@ def rewrite_with_ai(title, summary, category):
             timeout=40
         )
 
+        print("OpenRouter status:", response.status_code)
+
         data = response.json()
+
+        if response.status_code != 200:
+            print("OpenRouter ответил ошибкой:", data)
+            return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
+
         text = data["choices"][0]["message"]["content"].strip()
+
+        if not text:
+            return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
+
         return text
 
     except Exception as e:
         print("Ошибка ИИ-рерайта:", e)
         return summary.strip() if summary.strip() else "Подробности можно открыть по кнопке ниже."
+
 def rewrite_news(title, link, summary):
     title_lower = title.lower()
 
