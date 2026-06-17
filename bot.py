@@ -111,17 +111,6 @@ def is_duplicate_title(new_title):
     return False
 
 
-def get_source_name(link):
-    if "lenta.ru" in link:
-        return "Lenta.ru"
-    if "ria.ru" in link:
-        return "РИА Новости"
-    if "m24.ru" in link:
-        return "Москва 24"
-
-    return "Источник"
-
-
 def get_latest_news():
     for source in SOURCES:
         print("Проверяю источник:", source)
@@ -166,14 +155,12 @@ def get_latest_news():
             with open(SEEN_TITLES_FILE, "a", encoding="utf-8") as f:
                 f.write(title_original + "\n")
 
-            source_name = get_source_name(link)
-
-            return title_original, link, summary_original, source_name
+            return title_original, link, summary_original
 
     return None
 
 
-def rewrite_news(title, link, summary, source_name):
+def rewrite_news(title, link, summary):
     title_lower = title.lower()
 
     if any(word in title_lower for word in ["квартира", "жилье", "жильё", "пентхаус", "недвижимость", "новостройка", "дом", "застройщик"]):
@@ -222,10 +209,10 @@ def rewrite_news(title, link, summary, source_name):
     clean_summary = summary.strip()
 
     if not clean_summary:
-        clean_summary = "Подробности доступны по ссылке ниже."
+        clean_summary = "Подробности можно открыть по кнопке ниже."
 
-    if len(clean_summary) > 250:
-        clean_summary = clean_summary[:250].strip() + "..."
+    if len(clean_summary) > 350:
+        clean_summary = clean_summary[:350].strip() + "..."
 
     return (
         f"{category}\n"
@@ -245,26 +232,27 @@ def send_news_for_approval():
         send_message(MY_ID, "Не смог найти новости в источниках.")
         return
 
-    title, link, summary, source_name = result
+    title, link, summary = result
 
-    post = rewrite_news(title, link, summary, source_name)
+    post = rewrite_news(title, link, summary)
 
     if not post:
         send_message(MY_ID, "Новость не подходит под московские категории.")
         return
 
     keyboard = {
-    "inline_keyboard": [
-        [
-            {
-                "text": "📖 Читать подробнее",
-                "url": link
-            }
+        "inline_keyboard": [
+            [
+                {
+                    "text": "📖 Читать подробнее",
+                    "url": link
+                }
+            ]
         ]
-    ]
-}
+    }
 
     send_message(CHANNEL, post, keyboard)
     send_message(MY_ID, "✅ Новость опубликована в канал.")
+
 
 send_news_for_approval()
