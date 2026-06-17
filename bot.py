@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import feedparser
+from urllib.parse import quote
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "ВСТАВЬ_ТОКЕН_ТОЛЬКО_ЕСЛИ_ЗАПУСКАЕШЬ_НЕ_В_GITHUB")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -76,6 +77,46 @@ def send_message(chat_id, text, keyboard=None):
 
     print("Не удалось отправить сообщение")
     return None
+
+
+def send_photo(chat_id, image_url, caption):
+    data = {
+        "chat_id": chat_id,
+        "photo": image_url,
+        "caption": caption
+    }
+
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
+            json=data,
+            timeout=60
+        )
+
+        result = response.json()
+
+        if result.get("ok"):
+            print("Фото с постом отправлено")
+            return result
+
+        print("Telegram ответил ошибкой при отправке фото:", result)
+
+    except Exception as e:
+        print("Ошибка отправки фото:", e)
+
+    return None
+
+
+def generate_image_url(title, category):
+    prompt = f"""
+Moscow city news illustration, modern editorial style,
+category: {category},
+topic: {title},
+cinematic, realistic, high quality, no text, no logos
+"""
+
+    encoded_prompt = quote(prompt)
+    return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
 
 
 def normalize_title(title):
@@ -160,6 +201,7 @@ def get_latest_news():
 
     return None
 
+
 def rewrite_with_ai(title, summary, category):
     if not GROQ_API_KEY:
         print("Groq API key не найден")
@@ -170,19 +212,18 @@ def rewrite_with_ai(title, summary, category):
     prompt = f"""
 Перепиши новость для Telegram-канала Click Moscow.
 
-Стиль:
-- коротко
-- по-человечески
-- без воды
-- 2 предложения
-- только по-русски
+Правила:
+- не придумывай факты
+- используй только информацию из текста ниже
+- максимум 2 предложения
+- простой русский язык
 - без ссылок
 - без хэштегов
-- без заголовка
+- без заголовков
+- 40-80 слов
 
-Категория: {category}
-Заголовок: {title}
-Описание: {base_text}
+Новость:
+{base_text}
 """
 
     try:
@@ -216,6 +257,7 @@ def rewrite_with_ai(title, summary, category):
     except Exception as e:
         print("Ошибка Groq-рерайта:", e)
         return base_text
+
 
 def rewrite_news(title, link, summary):
     title_lower = title.lower()
@@ -271,7 +313,7 @@ def rewrite_news(title, link, summary):
     if len(clean_summary) > 350:
         clean_summary = clean_summary[:350].strip() + "..."
 
-    return (
+    post = (
         f"{category}\n"
         f"{'━' * 20}\n\n"
         f"🔥 {title.upper()}\n\n"
@@ -280,6 +322,8 @@ def rewrite_news(title, link, summary):
         f"{hashtags} #ClickMoscow\n\n"
         f"🔔 Подписывайтесь на Click Moscow"
     )
+
+    return post, category
 
 
 def send_news_for_approval():
@@ -291,24 +335,21 @@ def send_news_for_approval():
 
     title, link, summary = result
 
-    post = rewrite_news(title, link, summary)
+    rewritten = rewrite_news(title, link, summary)
 
-    if not post:
+    if not rewritten:
         send_message(MY_ID, "Новость не подходит под московские категории.")
         return
 
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {
-                    "text": "📖 Читать подробнее",
-                    "url": link
-                }
-            ]
-        ]
-    }
+    post, category = rewritten
 
-    send_message(CHANNEL, post, keyboard)
+    image_url = generate_image_url(title, category)
+
+    result = send_photo(CHANNEL, image_url, post)
+
+    if not result:
+        send_message(CHANNEL, post)
+
     send_message(MY_ID, "✅ Новость опубликована в канал.")
 
 
