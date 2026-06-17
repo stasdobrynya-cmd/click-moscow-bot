@@ -174,11 +174,11 @@ def rewrite_news(title, link):
         hashtags = "#Москва #Погода"
 
     else:
-    if not any(word in title_lower for word in ["москва", "москве", "москвы", "москов", "подмосков", "московская область"]):
-        return None
+        if not any(word in title_lower for word in ["москва", "москве", "москвы", "москов", "подмосков", "московская область"]):
+            return None
 
-    category = "🏙 Москва и область"
-    hashtags = "#Москва #МосковскаяОбласть"
+        category = "🏙 Москва и область"
+        hashtags = "#Москва #МосковскаяОбласть"
 
     return (
         f"{category}\n"
