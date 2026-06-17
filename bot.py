@@ -161,11 +161,13 @@ def get_latest_news():
     return None
 
 def rewrite_with_ai(title, summary, category):
-        if not GROQ_API_KEY:
-            print("Groq API key не найден")
-            return summary.strip() if summary.strip() else f"{title}. Подробности можно открыть по кнопке ниже."
+    if not GROQ_API_KEY:
+        print("Groq API key не найден")
+        return summary.strip() if summary.strip() else f"{title}. Подробности можно открыть по кнопке ниже."
 
-            prompt = f"""
+    base_text = summary.strip() if summary.strip() else title
+
+    prompt = f"""
 Перепиши новость для Telegram-канала Click Moscow.
 
 Стиль:
@@ -180,11 +182,11 @@ def rewrite_with_ai(title, summary, category):
 
 Категория: {category}
 Заголовок: {title}
-Описание: {summary}
+Описание: {base_text}
 """
 
-        try:
-            response = requests.post(
+    try:
+        response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -201,19 +203,19 @@ def rewrite_with_ai(title, summary, category):
             timeout=40
         )
 
-            print("Groq status:", response.status_code)
-            data = response.json()
+        print("Groq status:", response.status_code)
+        data = response.json()
 
-            if response.status_code != 200:
-                print("Groq ответил ошибкой:", data)
-                return summary.strip() if summary.strip() else f"{title}. Подробности можно открыть по кнопке ниже."
+        if response.status_code != 200:
+            print("Groq ответил ошибкой:", data)
+            return base_text
 
-                text = data["choices"][0]["message"]["content"].strip()
-            return text if text else f"{title}. Подробности можно открыть по кнопке ниже."
+        text = data["choices"][0]["message"]["content"].strip()
+        return text if text else base_text
 
-        except Exception as e:
-                print("Ошибка Groq-рерайта:", e)
-                return summary.strip() if summary.strip() else f"{title}. Подробности можно открыть по кнопке ниже."
+    except Exception as e:
+        print("Ошибка Groq-рерайта:", e)
+        return base_text
 
 def rewrite_news(title, link, summary):
     title_lower = title.lower()
