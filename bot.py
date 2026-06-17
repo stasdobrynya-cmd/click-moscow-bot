@@ -4,6 +4,7 @@ import requests
 import feedparser
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "ВСТАВЬ_ТОКЕН_ТОЛЬКО_ЕСЛИ_ЗАПУСКАЕШЬ_НЕ_В_GITHUB")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 CHANNEL = "@click_Moscow"
 MY_ID = 5183537335
