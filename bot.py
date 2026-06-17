@@ -4,6 +4,7 @@ import requests
 import feedparser
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "ВСТАВЬ_ТОКЕН_ТОЛЬКО_ЕСЛИ_ЗАПУСКАЕШЬ_НЕ_В_GITHUB")
+
 CHANNEL = "@click_Moscow"
 MY_ID = 5183537335
 
@@ -29,17 +30,17 @@ LOCAL_KEYWORDS = [
 SEEN_FILE = "seen_links.txt"
 SEEN_TITLES_FILE = "seen_titles.txt"
 
-try:
-    with open(SEEN_FILE, "r") as f:
-        seen_links = set(line.strip() for line in f.readlines())
-except FileNotFoundError:
-    seen_links = set()
 
-try:
-    with open(SEEN_TITLES_FILE, "r") as f:
-        seen_titles = set(line.strip() for line in f.readlines())
-except FileNotFoundError:
-    seen_titles = set()
+def load_seen_file(filename):
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            return set(line.strip() for line in f.readlines() if line.strip())
+    except FileNotFoundError:
+        return set()
+
+
+seen_links = load_seen_file(SEEN_FILE)
+seen_titles = load_seen_file(SEEN_TITLES_FILE)
 
 
 def send_message(chat_id, text, keyboard=None):
@@ -110,6 +111,17 @@ def is_duplicate_title(new_title):
     return False
 
 
+def get_source_name(link):
+    if "lenta.ru" in link:
+        return "Lenta.ru"
+    if "ria.ru" in link:
+        return "РИА Новости"
+    if "m24.ru" in link:
+        return "Москва 24"
+
+    return "Источник"
+
+
 def get_latest_news():
     for source in SOURCES:
         print("Проверяю источник:", source)
@@ -118,12 +130,15 @@ def get_latest_news():
         print("Источник:", source, "новостей найдено:", len(feed.entries))
 
         for entry in feed.entries:
-            title_original = entry.title
-            link = entry.link
-            summary = getattr(entry, "summary", "")
+            title_original = getattr(entry, "title", "")
+            link = getattr(entry, "link", "")
+            summary_original = getattr(entry, "summary", "")
+
+            if not title_original or not link:
+                continue
 
             title = title_original.lower()
-            summary = summary.lower()
+            summary = summary_original.lower()
             text_for_check = title + " " + summary
 
             print("Проверяю новость:", title)
@@ -136,27 +151,29 @@ def get_latest_news():
                 print("Пропущено как уже опубликованная ссылка:", title)
                 continue
 
-            if is_duplicate_title(title):
+            if is_duplicate_title(title_original):
                 print("Пропущено как дубль по смыслу:", title)
                 continue
 
             print("Найдена подходящая новость:", title)
 
             seen_links.add(link)
-            seen_titles.add(title)
+            seen_titles.add(title_original)
 
-            with open(SEEN_FILE, "a") as f:
+            with open(SEEN_FILE, "a", encoding="utf-8") as f:
                 f.write(link + "\n")
 
-            with open(SEEN_TITLES_FILE, "a") as f:
-                f.write(title + "\n")
+            with open(SEEN_TITLES_FILE, "a", encoding="utf-8") as f:
+                f.write(title_original + "\n")
 
-            return title_original, link
+            source_name = get_source_name(link)
 
-    return None, None
+            return title_original, link, summary_original, source_name
+
+    return None
 
 
-def rewrite_news(title, link):
+def rewrite_news(title, link, summary, source_name):
     title_lower = title.lower()
 
     if any(word in title_lower for word in ["квартира", "жилье", "жильё", "пентхаус", "недвижимость", "новостройка", "дом", "застройщик"]):
@@ -202,25 +219,37 @@ def rewrite_news(title, link):
         category = "🏙 Москва и область"
         hashtags = "#Москва #МосковскаяОбласть"
 
+    clean_summary = summary.strip()
+
+    if not clean_summary:
+        clean_summary = "Подробности доступны по ссылке ниже."
+
+    if len(clean_summary) > 250:
+        clean_summary = clean_summary[:250].strip() + "..."
+
     return (
         f"{category}\n"
         f"{'━' * 20}\n\n"
         f"🔥 {title.upper()}\n\n"
-        f"📰 Подробности:\n"
-        f"{link}\n\n"
+        f"📝 Кратко:\n"
+        f"{clean_summary}\n\n"
+        f"📰 Источник: {source_name}\n"
+        f"🔗 {link}\n\n"
         f"{hashtags} #ClickMoscow\n\n"
         f"🔔 Подписывайтесь на Click Moscow"
     )
 
 
 def send_news_for_approval():
-    title, link = get_latest_news()
+    result = get_latest_news()
 
-    if not title:
+    if not result:
         send_message(MY_ID, "Не смог найти новости в источниках.")
         return
 
-    post = rewrite_news(title, link)
+    title, link, summary, source_name = result
+
+    post = rewrite_news(title, link, summary, source_name)
 
     if not post:
         send_message(MY_ID, "Новость не подходит под московские категории.")
