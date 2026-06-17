@@ -2,8 +2,19 @@ name: Telegram News Bot
 
 on:
   schedule:
+    # Новости каждые 15 минут
     - cron: '5,20,35,50 * * * *'
+
+    # Утренний дайджест каждый день в 07:00 по Москве
+    # 07:00 МСК = 04:00 UTC
+    - cron: '0 4 * * *'
+
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Что запустить: news или digest'
+        required: true
+        default: 'news'
 
 jobs:
   run-bot:
@@ -12,6 +23,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set run mode
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "0 4 * * *" ]; then
+              echo "RUN_MODE=digest" >> $GITHUB_ENV
+            else
+              echo "RUN_MODE=news" >> $GITHUB_ENV
+            fi
+          else
+            echo "RUN_MODE=${{ github.event.inputs.mode }}" >> $GITHUB_ENV
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -26,5 +49,6 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          RUN_MODE: ${{ env.RUN_MODE }}
         run: |
           python bot.py
