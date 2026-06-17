@@ -144,24 +144,25 @@ def rewrite_news(title, link):
     if any(word in title_lower for word in ["метро", "мцд", "мцк", "дорог", "транспорт", "автобус", "поезд"]):
         category = "🚇 Транспорт"
         hashtags = "#Москва #Транспорт"
+
     elif any(word in title_lower for word in ["дтп", "пожар", "полиция", "задерж", "происшеств", "авар", "нападен"]):
-        category = "🚔 Происшествия"
+        category = "🚨 Происшествия"
         hashtags = "#Москва #Происшествия"
+
     elif any(word in title_lower for word in ["собянин", "мэр", "мэрия"]):
-        category = "🏛️ Городская власть"
+        category = "🏛 Городская власть"
         hashtags = "#Москва #Мэрия"
-    elif any(word in title_lower for word in ["парк", "парки", "пляж", "пляжи","зона отдыха", "отдых", "купание","вднх", "сокольник","зарядье", "горького","коломенское", "царицыно"]):
+
+    elif any(word in title_lower for word in ["парк", "парки", "пляж", "пляжи", "зона отдыха", "отдых", "купание", "вднх", "сокольники", "зарядье", "горького", "коломенское", "царицыно"]):
         category = "🌳 Парки и отдых"
         hashtags = "#Москва #Отдых"
-    else:
-        category = "🏙 Москва и область"
-        hashtags = "#Москва #МосковскаяОбласть"
+
     elif any(word in title_lower for word in ["фестиваль", "концерт", "выставка", "театр", "музей"]):
         category = "🎭 Афиша"
         hashtags = "#Москва #Афиша"
 
     elif any(word in title_lower for word in ["открыли", "открылся", "строительство", "реконструкция"]):
-        category = "🏗 Город" 
+        category = "🏗 Город"
         hashtags = "#Москва #Город"
 
     elif any(word in title_lower for word in ["бизнес", "инвестиции", "экономика"]):
@@ -172,16 +173,19 @@ def rewrite_news(title, link):
         category = "🌤 Погода"
         hashtags = "#Москва #Погода"
 
-    return (
-    f"{category}\n"
-    f"{'━' * 20}\n\n"
-    f"📍 {title}\n\n"
-    f"📰 Подробности:\n"
-    f"{link}\n\n"
-    f"{hashtags} #ClickMoscow\n\n"
-    f"🔔 Подписывайтесь на Click Moscow"
-)
+    else:
+        category = "🏙 Москва и область"
+        hashtags = "#Москва #МосковскаяОбласть"
 
+    return (
+        f"{category}\n"
+        f"{'━' * 20}\n\n"
+        f"📍 {title}\n\n"
+        f"📰 Подробности:\n"
+        f"{link}\n\n"
+        f"{hashtags} #ClickMoscow\n\n"
+        f"🔔 Подписывайтесь на Click Moscow"
+    )
 def send_news_for_approval():
     global pending_post
 
