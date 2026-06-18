@@ -1,5 +1,7 @@
 name: Telegram News Bot
 
+permissions:
+  contents: write
 on:
   schedule:
     # Новости каждые 15 минут
@@ -52,3 +54,11 @@ jobs:
           RUN_MODE: ${{ env.RUN_MODE }}
         run: |
           python bot.py
+
+      - name: Save seen files
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add seen_links.txt seen_titles.txt published_posts.jsonl || true
+          git commit -m "Update bot memory" || echo "No changes to commit"
+          git push || true
