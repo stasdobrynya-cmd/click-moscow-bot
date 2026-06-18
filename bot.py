@@ -14,7 +14,7 @@ CHANNEL = "@click_Moscow"
 MY_ID = 5183537335
 
 RUN_MODE = os.getenv("RUN_MODE", "news")
-MAX_POSTS_PER_RUN = 5
+MAX_POSTS_PER_RUN = 1
 
 MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
